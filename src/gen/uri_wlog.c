@@ -47,10 +47,10 @@
    The format of the file used by this module is very simple (maybe
    too simple):
 
-	URI1\0URI2\0......URIn\0
+	[HDR1\r\nHDR2\r\n...]URI1\0......[HDR1\r\nHDR2\r\n...]URIn\0
   
-   It is a simple concatenated list of URI separated by the \0 (end of
-   string) marker.
+   It is a simple concatenated list of Headers, URI separated by the
+   \0 (end of string) marker.
  
    This way, we don't need any parsing of the string when generating
    the URI.
@@ -86,13 +86,14 @@
 #include <core.h>
 #include <localevent.h>
 
-static char *fbase, *fend, *fcurrent;
+char *fbase, *fend, *fcurrent;
 
 static void
 set_uri (Event_Type et, Call * c)
 {
-  int len, did_wrap = 0;
+  int len = 0, did_wrap = 0;
   const char *uri;
+  char *hdr, *ptr;
 
   assert (et == EV_CALL_NEW && object_is_call (c));
 
@@ -114,8 +115,13 @@ set_uri (Event_Type et, Call * c)
 	    core_exit ();
 	}
       uri = fcurrent;
-      len = strlen (fcurrent);
-      call_set_uri (c, uri, len);
+      while ((ptr = strchr(uri, '\n')) != NULL) {
+        call_append_request_header (c, uri, ptr - uri + 1);
+        len += ptr - uri + 1;
+        uri = ptr + 1;
+      }
+      len += strlen (uri);
+      call_set_uri (c, uri, strlen(uri));
       fcurrent += len + 1;
     }
   while (len == 0);
